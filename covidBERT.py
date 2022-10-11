@@ -1,5 +1,5 @@
 import pandas as pd
-
+import time
 data = pd.read_csv("covid19_tweeter_dataset.csv")
 
 data['length'] = data['Tokanize_tweet'].apply(
@@ -27,6 +27,7 @@ import re
 import json
 import pickle 
 
+start = time.time()
 
 model = AutoModelForMaskedLM.from_pretrained("Shushant/nepaliBERT", output_hidden_states = True, return_dict = True, output_attentions = True)
 
@@ -74,8 +75,11 @@ def get_bert_embedding_sentence(input_sentence):
     return sentence_embedding.numpy()
 
 
+print("Extracting features")
 data['word_embeddings'] = data['Tweet'].apply(get_bert_embedding_sentence)
 
+end1 = time.time()
+print("Time taken",end1-start)
 data.to_csv("embeddings_data.csv")
 
 X,y = data['word_embeddings'], data['Label']
@@ -83,7 +87,7 @@ X,y = data['word_embeddings'], data['Label']
 
 train_X, test_X, train_y, test_y = train_test_split(X,y, test_size = 0.2, random_state = 420)
 
-
+print("Training SVC started")
 
 svc = SVC(probability=True)
 
@@ -148,16 +152,26 @@ gnb.score(test_X.tolist(), test_y)
 gnb_pred = gnb.predict(test_X.tolist())
 print(confusion_matrix(test_y, gnb_pred))
 
+
+print("Training RVC started")
+
+
 from skrvm import RVC
 
-clf = RVC()
+rvc = RVC()
 
-clf.fit(train_X.tolist(), train_y)
+rvc.fit(train_X.tolist(), train_y, n_jobs=-1)
 
-clf.score(test_X.tolist(), test_y)
+rvc.score(test_X.tolist(), test_y)
 
 import pickle
 # save the model to disk
 filename = 'rvc_model.sav'
-pickle.dump(clf, open(filename, 'wb'))
+pickle.dump(rvc, open(filename, 'wb'))
 
+
+rvc_pred = rvc.predict(test_X.tolist())
+print(confusion_matrix(test_y, rvc_pred))
+
+end2 = time.time()
+print("Time taken",end2-start)
